@@ -1,5 +1,10 @@
+import os
+import json
 import datetime
 from googlesearch import search, get_tbs
+import requests
+from bs4 import BeautifulSoup
+from pprint import pprint
 
 def do_google_search(query, date = None):
     timeframe = None
@@ -12,6 +17,64 @@ def do_google_search(query, date = None):
         query_results.append(j)
     return query_results
 
-def parse_html_page(html_links):
-    pass
+def parse_html_page(html_link):
+    print('page parsing:', html_link + '...')
+    try:
+        res = requests.get(html_link, timeout=5)
+    except:
+        print('WARNING! Request timed out:','Could not process request to', html_link)
+        return None
+    print('request finished:', html_link + '...')
+    html_page = res.content
+    soup = BeautifulSoup(html_page, 'html.parser')
+    print('souping complete:', html_link + '...')
+    text = soup.find_all(text=True)
+    print('found all text on page')
+    important_text = []
+    links = []
+    print('stripping text of non-important things')
+    for elem in text:
+        if (len(elem) > 30 and '{' not in elem and '}' not in elem and
+           '=' not in elem and "\"(" not in elem and "\")" not in elem and
+           '<' not in elem and '>' not in elem):
+            if 'https://' in elem:
+                link_start = elem.find('https://')
+                link_end = elem[link_start:].find(' ')
+                link = elem[link_start : link_end]
+                print('Found a link!', link)
+                links.append(link)
+            if 'http://' in elem:
+                print('Found a link!', elem)
+                link_start = elem.find('http://')
+                link_end = elem[link_start:].find(' ')
+                link = elem[link_start : link_end]
+                print('Found a link!', link)
+                links.append(link)
 
+            important_text.append(elem)
+
+    print('page parsed:', html_link)
+    return {'text': important_text, 'links': links}
+
+def create_stock_news_data(symbol, output_path, site_list, dates):
+    full_info = {}
+    for date in dates:
+        query_results = {}
+        for search_site in site_list:
+            query_results[search_site] = do_google_search(symbol + ' stock news ' + search_site, date)
+        google_output_file = os.path.join(output_path, symbol + 'google_search_' + date +'.txt')
+
+        with open(google_output_file, 'w') as outfile:
+            json.dump(full_info, outfile, indent=4)
+
+        with open(google_output_file, 'w') as outfile:
+            pprint(query_results, stream=outfile)
+        info = {}
+        for key in query_results:
+            for site in query_results[key]:
+                site_info = parse_html_page(site)
+                if site_info:
+                    info[site] = site_info
+        full_info[date] = info
+        with open(os.path.join(output_path, 'site_info.json'), 'w') as outfile:
+            json.dump(full_info, outfile, indent=4)
