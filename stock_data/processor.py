@@ -13,6 +13,7 @@ def split_train_val(full_json_path, ticker):
             val[daily_log] = full_data["Time Series (Daily)"][daily_log]
         else:
             train[daily_log] = full_data["Time Series (Daily)"][daily_log]
+
     top_dir = os.path.dirname(full_json_path)
     val_dir = os.path.join(top_dir, ticker + '_val.json')
     train_dir = os.path.join(top_dir, ticker + '_train.json')
