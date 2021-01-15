@@ -26,17 +26,17 @@ data = {
 download_flag = True
 
 search_sites =[
-    "Motley Fool",
+    # "Motley Fool",
     "Atom Finance",
     "Zacks Investment Research",
     "Stock Rover",
     "Morningstar",
     "TIM'S ALERTS",
-    "Trade Ideas",
+    # "Trade Ideas",
     "Seeking Alpha",
-    "Yahoo! Finance",
+    # "Yahoo! Finance",
     "The Wall Street Journal",
-    "Google Finance",
+    # "Google Finance",
     "cnbc",
     "benzinga",
     "MarketWatch",
@@ -63,7 +63,7 @@ def main():
             download_stock_data(API_URL, data) 
             stock_processor.split_train_val(os.path.join('dataset_info', data['symbol'], data['function'] + '_' + data['symbol'] + '_full' +'.json'), data['symbol'])
         else:
-            print('Warning: Data already exists for this', data['symbol'] ,'stock ticker.', 'Skipping download...')
+            print('Warning: Stock data already exists for', data['symbol'] ,'stock ticker.', 'Skipping stock price download...')
     scaler = MinMaxScaler(feature_range=(-1, 1))
 
     # Create train data
