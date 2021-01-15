@@ -5,6 +5,7 @@ from googlesearch import search, get_tbs
 import requests
 from bs4 import BeautifulSoup
 from pprint import pprint
+import re
 
 def do_google_search(query, date = None):
     timeframe = None
@@ -13,7 +14,7 @@ def do_google_search(query, date = None):
         from_date = to_date - datetime.timedelta(days=2)
         timeframe = get_tbs(from_date, to_date)
     query_results = []
-    for j in search(query, tld="co.in", num=10, stop=10, pause=2, tbs=timeframe):
+    for j in search(query, tld="co.in", num=2, stop=3, pause=2, tbs=timeframe):
         query_results.append(j)
     return query_results
 
@@ -24,17 +25,18 @@ def parse_html_page(html_link):
     except:
         print('WARNING! Request timed out:','Could not process request to', html_link)
         return None
-    print('request finished:', html_link + '...')
     html_page = res.content
-    soup = BeautifulSoup(html_page, 'html.parser')
-    print('souping complete:', html_link + '...')
+    try:
+        soup = BeautifulSoup(html_page, 'html.parser')
+    except:
+        print('Parsing failed:', html_link)
+        return None
     text = soup.find_all(text=True)
     print('found all text on page')
     important_text = []
     links = []
-    print('stripping text of non-important things')
     for elem in text:
-        if (len(elem) > 30 and '{' not in elem and '}' not in elem and
+        if (len(elem) > 200 and '{' not in elem and '}' not in elem and
            '=' not in elem and "\"(" not in elem and "\")" not in elem and
            '<' not in elem and '>' not in elem):
             if 'https://' in elem:
@@ -50,31 +52,46 @@ def parse_html_page(html_link):
                 link = elem[link_start : link_end]
                 print('Found a link!', link)
                 links.append(link)
-
-            important_text.append(elem)
+            removal_list = ['\n', '\t', '\u00a0', '\u201c']
+            for char in removal_list:
+                elem = elem.strip(char)
+            if len(elem) > 200:
+                sentences  = re.split("\\.\\s", elem)
+                for sentence in sentences:
+                    important_text.append(sentence)
 
     print('page parsed:', html_link)
     return {'text': important_text, 'links': links}
 
 def create_stock_news_data(symbol, output_path, site_list, dates):
-    full_info = {}
+    
     for date in dates:
+        full_info = {}
         query_results = {}
         for search_site in site_list:
-            query_results[search_site] = do_google_search(symbol + ' stock news ' + search_site, date)
-        google_output_file = os.path.join(output_path, symbol + 'google_search_' + date +'.txt')
+            try:
+                query_results[search_site] = do_google_search(symbol + ' stock news ' + search_site, date)
+            except:
+                print('WARNING: Google search', symbol + ' stock news ' + search_site, ' \nfor date:', date, '\nFAILED!!!!!!!!!')
 
-        with open(google_output_file, 'w') as outfile:
-            json.dump(full_info, outfile, indent=4)
+        google_output_file = os.path.join(output_path, symbol + 'google_search_' + date + '.txt')
 
         with open(google_output_file, 'w') as outfile:
             pprint(query_results, stream=outfile)
         info = {}
         for key in query_results:
+            info[key] = {}
             for site in query_results[key]:
                 site_info = parse_html_page(site)
                 if site_info:
-                    info[site] = site_info
+                    info[key][site] = site_info
         full_info[date] = info
-        with open(os.path.join(output_path, 'site_info.json'), 'w') as outfile:
-            json.dump(full_info, outfile, indent=4)
+        if not os.path.exists(os.path.join(output_path, 'site_info.json')):
+            with open(os.path.join(output_path, 'site_info.json'), 'w') as outfile:
+                json.dump(full_info, outfile, indent=4)
+        else:
+            with open(os.path.join(output_path, 'site_info.json'), 'r') as json_file:
+                data = json.load(json_file)
+                data[date] = full_info[date]
+            with open(os.path.join(output_path, 'site_info.json'), 'w') as json_file:
+                json.dump(data, json_file, indent=4)
